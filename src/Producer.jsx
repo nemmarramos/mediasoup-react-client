@@ -3,7 +3,7 @@ import { Col, Row, Button } from 'antd'
 import shortid from 'shortid'
 
 import socket from './socket';
-import { getDevice } from './mediasoup';
+import { getDevice, loadDevice } from './mediasoup';
 
 const constraints = {
     audio: true,
@@ -40,16 +40,19 @@ const Producer = ({ roomName }) => {
         });
     }
 
-    const loadRouterRtpCapabilities = async routerRtpCapabilities => {
-        setDevice(await getDevice({ routerRtpCapabilities }))
+    const loadProducer = async routerRtpCapabilities => {
+        const device = await loadDevice({ routerRtpCapabilities })
+        socket.emit('createProducerTransport', {
+            peerId,
+            forceTcp: false,
+            rtpCapabilities: device.rtpCapabilities,
+        })
+ 
         setIsBroadcasting(true)
-
-        socket.emit('publishRoom', { peerId, room: roomName }, loadRouterRtpCapabilities)
-
     }
 
     const onPublish = _ => {
-        socket.emit('publishRoom', { peerId, room: roomName }, loadRouterRtpCapabilities)
+        socket.emit('publishRoom', { peerId, room: roomName }, loadProducer)
     }
     const onUnpublish = _ => {
         socket.emit('unpublishRoom', { peerId, room: roomName }, () => setIsBroadcasting(false))
