@@ -1,4 +1,4 @@
-import mediasoupClient, { Device } from 'mediasoup-client';
+import { Device } from 'mediasoup-client';
 let device = new Device();
 
 export const loadDevice = async ({ routerRtpCapabilities }) => {

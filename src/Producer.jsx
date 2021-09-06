@@ -1,58 +1,148 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Col, Row, Button } from 'antd'
 import shortid from 'shortid'
 
 import socket from './socket';
-import { getDevice, loadDevice } from './mediasoup';
+import useStreaming from './hooks/useStreaming';
+import useVideoCamera from './hooks/useVideoCamera';
 
-const constraints = {
-    audio: true,
-    video: true
-};
+const CAM_VIDEO_SIMULCAST_ENCODINGS =
+[
+  { maxBitrate:  96000, scaleResolutionDownBy: 4 },
+  { maxBitrate: 680000, scaleResolutionDownBy: 1 },
+];
 
 const peerId = shortid.generate()
 
 const Producer = ({ roomName }) => {
+    const [isVideoSharingEnabled, setIsVideoSharingEnabled] = useState(false)
+    const [isAudioSharingEnabled, setIsAudioSharingEnabled] = useState(false)
     const [isBroadcasting, setIsBroadcasting] = useState(false)
-    const [device, setDevice] = useState()
-
-    useEffect(() => {
-        startCamera()
-
-        return () => {
-            // stopCamera()
-        }
-    }, [])
-
-    const startCamera = _ => {
-        navigator.mediaDevices
-        .getUserMedia(constraints)
-        .then(function(stream) {
-            var video = document.getElementById("producer-videocam");
-            video.srcObject = stream;
-
-            stream.getAudioTracks().forEach(track => {
-              track.enabled = true
-            });
-        })
-        .catch(function(err) {
-            console.log(err.name + ": " + err.message);
-        });
-    }
+    const { device, loadRtpCapabilities } = useStreaming({ room: roomName })
+    const { mediaStream } = useVideoCamera()
 
     const loadProducer = async routerRtpCapabilities => {
-        const device = await loadDevice({ routerRtpCapabilities })
-        socket.emit('createProducerTransport', {
-            peerId,
-            forceTcp: false,
-            rtpCapabilities: device.rtpCapabilities,
+        await loadRtpCapabilities(routerRtpCapabilities)
+    }
+
+    const createTransport = async _ => {
+        const transportResponse = await new Promise(resolve => {
+            // ??
+            socket.emit('createWebRTCTransport', {
+                peerId,
+                type: 'producer',
+                room: roomName,
+                forceTcp: false,
+                rtpCapabilities: device.rtpCapabilities,
+            }, transport => resolve(transport))
         })
- 
-        setIsBroadcasting(true)
+
+        // ??
+        const transport = device.createSendTransport(transportResponse.params);
+
+        transport.on('connect',  ({ dtlsParameters }, callback, errback) => {
+            console.log('onConnect:dtlsParameters', dtlsParameters)
+            // ??
+            socket.emit('connectWebRTCTransport', {
+                type: 'producer',
+                room: roomName,
+                dtlsParameters,
+                peerId
+            }, callback)
+        });
+
+        transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+            console.log('transport produce event', { kind, rtpParameters, appData });
+            // we may want to start out paused (if the checkboxes in the ui
+            // aren't checked, for each media type. not very clean code, here
+            // but, you know, this isn't a real application.)
+            let paused = false;
+            if (kind === 'video') {
+                paused = isVideoSharingEnabled;
+            } else if (kind === 'audio') {
+                paused = isAudioSharingEnabled;
+            }
+            // tell the server what it needs to know from us in order to set
+            // up a server-side producer object, and get back a
+            // producer.id. call callback() on success or errback() on
+            // failure.
+            // let { error, id } = await sig('send-track', {
+            //     transportId: transportOptions.id,
+            //     kind,
+            //     rtpParameters,
+            //     paused,
+            //     appData
+            // });
+            const track = {
+                transportId: transportResponse.params.id,
+                kind,
+                rtpParameters,
+                paused,
+                appData
+            }
+            console.log('track', track)
+            console.log('emit produce')
+
+            socket.emit('produce', {
+                // transportId: transportOptions.id,
+                room: roomName,
+                kind,
+                rtpParameters,
+                paused,
+                peerId,
+                // appData
+            }, callback)
+        });
+        transport.on('connectionstatechange', async (state) => {
+            console.log(`transport ${transport.id} connectionstatechange ${state}`);
+            // for this simple sample code, assume that transports being
+            // closed is an error (we never close these transports except when
+            // we leave the room)
+            if (state === 'closed' || state === 'failed' || state === 'disconnected') {
+                console.log('transport closed ... leaving the room and resetting');
+            //   leaveRoom();
+            }
+        });
+        console.log('createTransport return transport', transport)
+        return transport;
+    }
+
+    const startVideoCameraBroadcast = async routerRtpCapabilities => {
+        try {
+            console.log('startVideoCameraBroadcast:device', device);
+
+            await loadProducer(routerRtpCapabilities);
+            const transport = await createTransport();
+            console.log('startVideoCameraBroadcast:transport', transport);
+
+            console.log('mediaStream.getVideoTracks()', mediaStream.getVideoTracks())
+
+            const camVideoProducer = transport.produce({
+                track: mediaStream.getVideoTracks()[0],
+                encodings: CAM_VIDEO_SIMULCAST_ENCODINGS,
+                // appData: { mediaTag: 'cam-video' }
+            });
+
+            setIsBroadcasting(true)
+
+            console.log('startVideoCameraBroadcast:camVideoProducer', camVideoProducer);
+
+            const camAudioProducer = transport.produce({
+                track: mediaStream.getAudioTracks()[0],
+                appData: { mediaTag: 'cam-audio' }
+            });
+
+            setIsBroadcasting(true)
+
+            console.log('setIsBroadcasting', isBroadcasting)
+        } catch (error) {
+            console.error(error)
+        }
+
     }
 
     const onPublish = _ => {
-        socket.emit('publishRoom', { peerId, room: roomName }, loadProducer)
+        socket.emit('joinRoom', { peerId, room: roomName }, startVideoCameraBroadcast)
     }
     const onUnpublish = _ => {
         socket.emit('unpublishRoom', { peerId, room: roomName }, () => setIsBroadcasting(false))
