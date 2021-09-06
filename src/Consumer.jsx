@@ -68,6 +68,31 @@ const Consumer = ({ roomName }) => {
         console.log('consumerOptions', consumerOptions)
 
         const consumer = await transport.consume(consumerOptions)
+
+        const stream = new MediaStream();
+        stream.addTrack(consumer.track);
+
+        var video = document.querySelector("#consumer-videocam");
+        video.srcObject = stream;
+
+        var promise = video.play();
+
+        if (promise !== undefined) {
+
+            promise.then(_ => {
+
+              // Autoplay started!
+
+            }).catch(error => {
+              console.error(error)
+              // Autoplay was prevented.
+
+              // Show a "Play" button so that user can start playback.
+            });
+
+          }
+
+        return stream;
     }
 
     const joinRoom = async _ => {
@@ -86,7 +111,6 @@ const Consumer = ({ roomName }) => {
                         background: 'black'
                     }}
                     autoPlay
-                    muted
                 />
             </Col>
             <Col span={12}>
