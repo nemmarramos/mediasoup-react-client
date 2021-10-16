@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 
 const constraints = {
     audio: true,
-    video: true
+    video: {width: 320, height: 180, facingMode: "user"}
 };
 
-export default function useVideoCamera() {
+export default function useVideoCamera(elementId) {
     const [mediaStream, setMediaStream] = useState()
 
     useEffect(() => {
@@ -24,7 +24,7 @@ export default function useVideoCamera() {
         return navigator.mediaDevices
         .getUserMedia(constraints)
         .then(function(stream) {
-            var video = document.getElementById("producer-videocam");
+            var video = document.getElementById(elementId);
             video.srcObject = stream;
 
             stream.getAudioTracks().forEach(track => {

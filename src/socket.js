@@ -1,12 +1,15 @@
 import { io } from "socket.io-client";
-var socket = io("http://localhost:8080", {
+const socketUrl = process.env.REACT_APP_STREAM_SOCKET_URL
+
+var socket = io(socketUrl, {
     reconnection: true,
-    reconnectionDelayMax: 1000
+    reconnectionDelayMax: 1000,
+    transports:["websocket"]
 });
 
 export const getSocket = () => {
     if (socket.disconnected) {
-        let newSocket = io("http://localhost:8080", {
+        let newSocket = io(socketUrl, {
             reconnection: true,
             reconnectionDelayMax: 10,
             forceNew: true,

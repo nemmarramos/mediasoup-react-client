@@ -4,8 +4,9 @@ import {
   Switch,
   Route
 } from "react-router-dom";
-import Home from './Home';
-import Room from './Room';
+import Home from './containers/Home';
+import Room from './containers/Room';
+import Conference from './containers/Conference';
 
 function App() {
   return (
@@ -14,7 +15,9 @@ function App() {
         <Route path="/room/:roomName">
           <Room />
         </Route>
-
+        <Route path="/conference/:roomName">
+          <Conference />
+        </Route>
         <Route path="/">
           <Home />
         </Route>

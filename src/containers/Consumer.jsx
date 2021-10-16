@@ -1,28 +1,23 @@
 import { Col, Row, Button } from 'antd'
 import shortid from 'shortid'
-import useStreaming from './hooks/useStreaming';
+import useStreaming from '../hooks/useStreaming';
 
-import socket from './socket';
+import socket from '../socket';
 
 const peerId = shortid.generate()
 
 const Consumer = ({ roomName }) => {
     const {
         getRtpCapabilities,
-        getConsumerOptions,
-        createTransport,
-        loadRtpCapabilities
+        getConsumer,
     } = useStreaming({
         room: roomName,
         socket,
         peerId
     })
 
-    const connectToRoom = async rtpCapabilities => {
-        await loadRtpCapabilities(rtpCapabilities)
-        const transport = await createTransport();
-        const consumerOptions = await getConsumerOptions()
-        const consumer = await transport.consume(consumerOptions)
+    const connectToRoom = async _ => {
+        const consumer = await getConsumer()
 
         const stream = new MediaStream();
         stream.addTrack(consumer.track);
@@ -51,8 +46,7 @@ const Consumer = ({ roomName }) => {
     }
 
     const joinRoom = async _ => {
-        const rtpCapabilities = await getRtpCapabilities()
-        connectToRoom(rtpCapabilities)
+        await connectToRoom()
     }
 
     return (
