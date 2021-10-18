@@ -12,6 +12,7 @@ const Conference = () => {
     const [peerId] = useState(shortid.generate())
     const [cameraStream, setCameraStream] = useState()
     const [participants, setParticipants] = useState([])
+    const [isProducing, setIsProducing] = useState()
     let match = useRouteMatch();
     const roomName = match.params.roomName
 
@@ -69,9 +70,12 @@ const Conference = () => {
 
     useEffect(() => {
         const startBroadcast = async () => {
-            await produce(cameraStream) 
+            await produce(cameraStream)
+            setIsProducing(true)
         }
-        if (cameraStream) startBroadcast()
+        if (cameraStream && !isProducing) {
+            startBroadcast()
+        }
         
     }, [cameraStream])
 
