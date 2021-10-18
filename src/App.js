@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import Home from './containers/Home';
 import Room from './containers/Room';
-import Conference from './containers/Conference';
+import Conference from './containers/conference/Conference';
 
 function App() {
   return (

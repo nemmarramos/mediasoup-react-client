@@ -1,13 +1,12 @@
 import { useRouteMatch } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react';
 import shortid from 'shortid';
-import { notification } from 'antd';
+import { List, notification } from 'antd';
 
-import socket from '../socket';
-import SelfCameraView from '../components/SelfCameraView';
-import useStreaming from '../hooks/useStreaming';
-
-const generateRandomColor = _ => Math.floor(Math.random()*16777215).toString(16);
+import socket from '../../socket';
+import SelfCameraView from '../../components/SelfCameraView';
+import useStreaming from '../../hooks/useStreaming';
+import Participant from './Participant';
 
 const Conference = () => {
     const [peerId] = useState(shortid.generate())
@@ -42,7 +41,8 @@ const Conference = () => {
         produce,
         joinRoom,
         leaveRoom,
-        getParticipants
+        getParticipants,
+        getConsumer
     } = useStreaming({
         socket,
         room: roomName,
@@ -94,20 +94,36 @@ const Conference = () => {
                 <div className="flex justify-center w-full">
                     <h3 className="z-10 font-bold text-gray-800 text-xl">{roomName}</h3>
                 </div>
-                <div className="flex justify-center absolute bottom-0 left-0 h-52 bg-white w-full">
-                    <div className="grid grid-cols-3 gap-4">
-                        {
-                            participants.map(p => (
-                                <div
-                                    style={{
-                                        background: `#${generateRandomColor}`
-                                    }}
-                                >
-                                    {p.displayName}
-                                </div>
-                            ))
+                <div className="flex justify-center absolute bottom-0 left-0 bg-white w-full p-2">
+                    <List
+                        className="w-full"
+                        dataSource={participants}
+                        grid={{
+                            gutter: 16,
+                            xs: 2,
+                            sm: 2,
+                            md: 4,
+                            lg: 5,
+                            xl: 6,
+                            xxl: 8,
+                        }}
+                        renderItem={
+                            item => {
+                                return (
+                                    <List.Item>
+                                        <Participant
+                                            peerId={peerId}
+                                            displayName={item.displayName}
+                                            toConsumePeerId={item.identifier}
+                                            getVideoConsumer={() => getConsumer({ toConsumePeerId: item.identifier, kind: 'video' })}
+                                            getAudioConsumer={() => getConsumer({ toConsumePeerId: item.identifier, kind: 'audio' })}
+                                            isSelf={item.identifier === peerId}
+                                        />
+                                    </List.Item>
+                                )
+                            }
                         }
-                    </div>
+                    />
                 </div>
             </div>
         </div>

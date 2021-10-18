@@ -40,9 +40,10 @@ export default function useStreaming({
     //     })
     // }
 
-    const getConsumer = async _ => {
+    const getConsumer = async ({ toConsumePeerId, kind }) => {
+        console.log('getConsumer toConsumePeerId', toConsumePeerId)
         const transport = await createTransport();
-        const consumerOptions = await getConsumerOptions()
+        const consumerOptions = await getConsumerOptions({ toConsumePeerId, kind })
         const consumer = await transport.consume(consumerOptions)
         return consumer;
     }
@@ -86,12 +87,13 @@ export default function useStreaming({
         transport && await transport.close()
     }
 
-    const getConsumerOptions = () => {
+    const getConsumerOptions = ({ toConsumePeerId, kind }) => {
         return new Promise(resolve => {
             socket.emit('consume', {
                 room,
                 peerId,
-                kind: 'video',
+                kind,
+                toConsumePeerId
             }, resolve)
         })
     }
