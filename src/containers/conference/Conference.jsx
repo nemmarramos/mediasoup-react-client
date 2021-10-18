@@ -13,6 +13,8 @@ const Conference = () => {
     const [cameraStream, setCameraStream] = useState()
     const [participants, setParticipants] = useState([])
     const [isProducing, setIsProducing] = useState()
+    const [isRoomStarted, setIsRoomStarted] = useState()
+    
     let match = useRouteMatch();
     const roomName = match.params.roomName
 
@@ -57,6 +59,7 @@ const Conference = () => {
     useEffect(() => {
         const startConnection = async _ => {
             await joinRoom()
+            setIsRoomStarted(true)
             const participants = await getParticipants()
             setParticipants(participants)
         }
@@ -77,7 +80,7 @@ const Conference = () => {
             startBroadcast()
         }
         
-    }, [cameraStream])
+    }, [cameraStream, isRoomStarted])
 
     return (
         <div className="w-screen h-screen">
