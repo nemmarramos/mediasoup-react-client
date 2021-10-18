@@ -111,16 +111,16 @@ export default function useStreaming({
     const createTransport = useCallback(
         async (canProduce = false) => {
 
-            console.log('createTransportcanProduce canProduce', canProduce)
-            console.log('createTransportcanProduce device', device)
-            console.log('createTransportcanProduce rtpCapabilities', rtpCapabilities)
+            console.log('createTransport canProduce', canProduce)
+            console.log('createTransport device', device)
+            console.log('createTransport rtpCapabilities', rtpCapabilities)
             let currentRtpCapabilities = rtpCapabilities
 
             if (!currentRtpCapabilities) {
                 currentRtpCapabilities = await getRtpCapabilities()
             }
-            
-            await loadRtpCapabilities(rtpCapabilities)
+
+            await loadRtpCapabilities(currentRtpCapabilities)
     
             const type = canProduce ? 'producer': 'consumer';
             const transportResponse = await new Promise(resolve => {

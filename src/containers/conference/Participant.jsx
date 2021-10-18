@@ -16,7 +16,6 @@ const Participant = ({
     getVideoConsumer,
     getAudioConsumer,
     isSelf,
-    peerId,
     toConsumePeerId
 }) => {
     const videoElementId = `participant_video_${toConsumePeerId}`
@@ -94,7 +93,7 @@ const Participant = ({
                     background: getRandomColor()
                 }}
             >
-                <Meta title={displayName} description={`peerId: ${toConsumePeerId}`}/>
+                <Meta title={`${displayName} ${isSelf ? '- You' : '' }`} description={`peerId: ${toConsumePeerId}`}/>
                 <audio
                     id={audioElementId}
                     autoPlay

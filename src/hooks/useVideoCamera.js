@@ -7,16 +7,18 @@ const constraints = {
 
 export default function useVideoCamera(elementId) {
     const [mediaStream, setMediaStream] = useState()
-
     useEffect(() => {
         async function startCameraAsync() {
             const mediaStream = await startCamera()
             setMediaStream(mediaStream)
+            return mediaStream
         }
         startCameraAsync();
         
         return () => {
-            // stopCamera()
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
         }
     }, [])
 
