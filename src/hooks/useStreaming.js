@@ -1,5 +1,5 @@
 import { Device } from "mediasoup-client";
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import shortid from "shortid";
 
 const CAM_VIDEO_SIMULCAST_ENCODINGS =
@@ -98,83 +98,86 @@ export default function useStreaming({
         })
     }
 
-    const createTransport = async (canProduce = false) => {
+    const createTransport = useCallback(
+        async (canProduce = false) => {
 
-        console.log('createTransportcanProduce canProduce', canProduce)
-        console.log('createTransportcanProduce device', device)
-        console.log('createTransportcanProduce rtpCapabilities', rtpCapabilities)
-        await loadRtpCapabilities(rtpCapabilities)
-
-        const type = canProduce ? 'producer': 'consumer';
-        const transportResponse = await new Promise(resolve => {
-            socket.emit('createWebRTCTransport', {
-                peerId,
-                type,
-                room,
-                forceTcp: false,
-                rtpCapabilities: device.rtpCapabilities,
-            }, transport => resolve(transport))
-        })
-
-        let transport = null;
-
-        if (canProduce) {
-            transport = device.createSendTransport(transportResponse.params);
-            transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-                console.log('transport produce event', { kind, rtpParameters, appData });
-                // we may want to start out paused (if the checkboxes in the ui
-                // aren't checked, for each media type. not very clean code, here
-                // but, you know, this isn't a real application.)
-                let paused = false;
-                if (kind === 'video') {
-                    paused = isVideoSharingEnabled;
-                } else if (kind === 'audio') {
-                    paused = isAudioSharingEnabled;
-                }
-                // tell the server what it needs to know from us in order to set
-                // up a server-side producer object, and get back a
-                // producer.id. call callback() on success or errback() on
-                // failure.
-                // let { error, id } = await sig('send-track', {
-                //     transportId: transportOptions.id,
-                //     kind,
-                //     rtpParameters,
-                //     paused,
-                //     appData
-                // });
+            console.log('createTransportcanProduce canProduce', canProduce)
+            console.log('createTransportcanProduce device', device)
+            console.log('createTransportcanProduce rtpCapabilities', rtpCapabilities)
+            await loadRtpCapabilities(rtpCapabilities)
     
-                socket.emit('produce', {
-                    room,
-                    kind,
-                    rtpParameters,
-                    paused,
+            const type = canProduce ? 'producer': 'consumer';
+            const transportResponse = await new Promise(resolve => {
+                socket.emit('createWebRTCTransport', {
                     peerId,
-                }, callback)
+                    type,
+                    room,
+                    forceTcp: false,
+                    rtpCapabilities: device.rtpCapabilities,
+                }, transport => resolve(transport))
+            })
+    
+            let transport = null;
+    
+            if (canProduce) {
+                transport = device.createSendTransport(transportResponse.params);
+                transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+                    console.log('transport produce event', { kind, rtpParameters, appData });
+                    // we may want to start out paused (if the checkboxes in the ui
+                    // aren't checked, for each media type. not very clean code, here
+                    // but, you know, this isn't a real application.)
+                    let paused = false;
+                    if (kind === 'video') {
+                        paused = isVideoSharingEnabled;
+                    } else if (kind === 'audio') {
+                        paused = isAudioSharingEnabled;
+                    }
+                    // tell the server what it needs to know from us in order to set
+                    // up a server-side producer object, and get back a
+                    // producer.id. call callback() on success or errback() on
+                    // failure.
+                    // let { error, id } = await sig('send-track', {
+                    //     transportId: transportOptions.id,
+                    //     kind,
+                    //     rtpParameters,
+                    //     paused,
+                    //     appData
+                    // });
+        
+                    socket.emit('produce', {
+                        room,
+                        kind,
+                        rtpParameters,
+                        paused,
+                        peerId,
+                    }, callback)
+                });
+            } else {
+                transport = await device.createRecvTransport(transportResponse.params);
+            }
+    
+            transport.on('connect', async ({ dtlsParameters }, callback) => {
+                socket.emit('connectWebRTCTransport', { type, room, dtlsParameters, peerId }, callback)
             });
-        } else {
-            transport = await device.createRecvTransport(transportResponse.params);
-        }
-
-        transport.on('connect', async ({ dtlsParameters }, callback) => {
-            socket.emit('connectWebRTCTransport', { type, room, dtlsParameters, peerId }, callback)
-        });
-        transport.on('connectionstatechange', async (state) => {
-            console.log(`transport ${transport.id} connectionstatechange ${state}`);
-            
-            if (state === "connected") {
-                setIsBroadcasting(true)
-            }
-
-            // for this simple sample code, assume that transports being
-            // closed is an error (we never close these transports except when
-            // we leave the room)
-            if (state === 'closed' || state === 'failed' || state === 'disconnected') {
-                console.log('transport closed ... leaving the room and resetting');
-              leaveRoomTransport(transport);
-            }
-        });
-        return transport;
-    }
+            transport.on('connectionstatechange', async (state) => {
+                console.log(`transport ${transport.id} connectionstatechange ${state}`);
+                
+                if (state === "connected") {
+                    setIsBroadcasting(true)
+                }
+    
+                // for this simple sample code, assume that transports being
+                // closed is an error (we never close these transports except when
+                // we leave the room)
+                if (state === 'closed' || state === 'failed' || state === 'disconnected') {
+                    console.log('transport closed ... leaving the room and resetting');
+                  leaveRoomTransport(transport);
+                }
+            });
+            return transport;
+        },
+        [rtpCapabilities],
+    )
 
     const produce = async mediaStream => {
         const transport = await createTransport(true);
@@ -195,10 +198,6 @@ export default function useStreaming({
     }
 
     const loadRtpCapabilities = async routerRtpCapabilities => {
-        // if (!device) {
-        //     initiateDevice()
-        // }
-
         if (device && !device._loaded) {
             await device.load({ routerRtpCapabilities });
         }
