@@ -71,6 +71,16 @@ export default function useStreaming({
 
         setRtpCapabilities(roomRtpCapabilities)
     }
+
+    const getRtpCapabilities = async _ => {
+        const rtpCapabilities = await new Promise(resolve => {
+            socket.emit('getRtpCapabilities', {
+                room
+            })
+        })
+
+        return rtpCapabilities
+    }
     
     const leaveRoom = _ => {
         return new Promise(resolve => {
@@ -104,6 +114,12 @@ export default function useStreaming({
             console.log('createTransportcanProduce canProduce', canProduce)
             console.log('createTransportcanProduce device', device)
             console.log('createTransportcanProduce rtpCapabilities', rtpCapabilities)
+            let currentRtpCapabilities = rtpCapabilities
+
+            if (!currentRtpCapabilities) {
+                currentRtpCapabilities = await getRtpCapabilities()
+            }
+            
             await loadRtpCapabilities(rtpCapabilities)
     
             const type = canProduce ? 'producer': 'consumer';
