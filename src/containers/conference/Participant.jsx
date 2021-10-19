@@ -2,15 +2,20 @@ import { Card } from "antd"
 import Meta from "antd/lib/card/Meta"
 import { useEffect } from "react";
 
-function getRandomColor() {
-    var letters = '0123456789ABCDEF';
-    var color = '#';
-    for (var i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-  }
-  
+// function getRandomColor() {
+//     var letters = '0123456789ABCDEF';
+//     var color = '#';
+//     for (var i = 0; i < 6; i++) {
+//       color += letters[Math.floor(Math.random() * 16)];
+//     }
+//     return color;
+//   }
+function getRandomColor(stringInput) {
+    let stringUniqueHash = [...stringInput].reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    return `hsl(${stringUniqueHash % 360}, 95%, 35%)`;
+}
 const Participant = ({
     displayName,
     getVideoConsumer,
@@ -90,7 +95,7 @@ const Participant = ({
                     />
                 } 
                 style={{
-                    background: getRandomColor()
+                    background: getRandomColor(toConsumePeerId)
                 }}
             >
                 <Meta title={`${displayName} ${isSelf ? '- You' : '' }`} description={`peerId: ${toConsumePeerId}`}/>
@@ -98,7 +103,7 @@ const Participant = ({
                     id={audioElementId}
                     autoPlay
                     playsInline
-                /> 
+                />
             </Card>
         </div>
     )

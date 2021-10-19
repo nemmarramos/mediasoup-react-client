@@ -18,6 +18,8 @@ export default function useStreaming({
 }) {
     const device = new Device();
     const [rtpCapabilities, setRtpCapabilities] = useState()
+    const [sendingTransport, setSendingTransport] = useState()
+    const [receivingTransport, setReceivingTransport] = useState()
     const [isBroadcasting, setIsBroadcasting] = useState(false)
     const [isVideoSharingEnabled] = useState(false)
     const [isAudioSharingEnabled] = useState(false)
@@ -40,15 +42,29 @@ export default function useStreaming({
     //     })
     // }
 
+    const setupTransports = async _ => {
+        console.log('******************** setupTransports');
+        if (!receivingTransport) {
+            const transport = await createTransport();
+            setReceivingTransport(transport)
+        }
+        if (!sendingTransport) {
+            const transport = await createTransport(true);
+            setSendingTransport(transport)
+        }
+        console.log('******************** end setupTransports');
+    }
+
     const getConsumer = async ({ toConsumePeerId, kind }) => {
-        console.log('getConsumer toConsumePeerId', toConsumePeerId)
-        const transport = await createTransport();
+        console.log('******************** getConsumer');
         const consumerOptions = await getConsumerOptions({ toConsumePeerId, kind })
-        const consumer = await transport.consume(consumerOptions)
+        const consumer = await receivingTransport.consume(consumerOptions)
         return consumer;
     }
     
     const getParticipants = async _ => {
+        console.log('******************** getParticipants');
+
         const participants = await new Promise(resolve => {
             socket.emit('getParticipants', {
                 room,
@@ -61,22 +77,20 @@ export default function useStreaming({
     }
 
     const joinRoom = async _ => {
-        const roomRtpCapabilities = await new Promise(resolve => {
+        await new Promise(resolve => {
             socket.emit('joinRoom', {
                 room,
                 peerId,
                 userProfile
             }, resolve)
         })
-
-        setRtpCapabilities(roomRtpCapabilities)
     }
 
     const getRtpCapabilities = async _ => {
         const rtpCapabilities = await new Promise(resolve => {
             socket.emit('getRtpCapabilities', {
                 room
-            })
+            }, resolve)
         })
 
         return rtpCapabilities
@@ -108,97 +122,92 @@ export default function useStreaming({
         })
     }
 
-    const createTransport = useCallback(
-        async (canProduce = false) => {
+    const createTransport =  async (canProduce = false) => {
 
-            console.log('createTransport canProduce', canProduce)
-            console.log('createTransport device', device)
-            console.log('createTransport rtpCapabilities', rtpCapabilities)
-            let currentRtpCapabilities = rtpCapabilities
+        console.log('createTransport canProduce', canProduce)
+        console.log('createTransport rtpCapabilities', rtpCapabilities)
+        let currentRtpCapabilities = await getRtpCapabilities()
 
-            if (!currentRtpCapabilities) {
-                currentRtpCapabilities = await getRtpCapabilities()
-            }
+        await loadRtpCapabilities(currentRtpCapabilities)
+        console.log('createTransport device', device)
 
-            await loadRtpCapabilities(currentRtpCapabilities)
+        const type = canProduce ? 'producer': 'consumer';
+        const transportResponse = await new Promise(resolve => {
+            socket.emit('createWebRTCTransport', {
+                peerId,
+                type,
+                room,
+                forceTcp: false,
+                rtpCapabilities: device.rtpCapabilities,
+            }, transport => resolve(transport))
+        })
+
+        let transport = null;
+
+        if (canProduce) {
+            transport = device.createSendTransport(transportResponse.params);
+            transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+                console.log('transport produce event', { kind, rtpParameters, appData });
+                // we may want to start out paused (if the checkboxes in the ui
+                // aren't checked, for each media type. not very clean code, here
+                // but, you know, this isn't a real application.)
+                let paused = false;
+                if (kind === 'video') {
+                    paused = isVideoSharingEnabled;
+                } else if (kind === 'audio') {
+                    paused = isAudioSharingEnabled;
+                }
+                // tell the server what it needs to know from us in order to set
+                // up a server-side producer object, and get back a
+                // producer.id. call callback() on success or errback() on
+                // failure.
+                // let { error, id } = await sig('send-track', {
+                //     transportId: transportOptions.id,
+                //     kind,
+                //     rtpParameters,
+                //     paused,
+                //     appData
+                // });
     
-            const type = canProduce ? 'producer': 'consumer';
-            const transportResponse = await new Promise(resolve => {
-                socket.emit('createWebRTCTransport', {
-                    peerId,
-                    type,
+                socket.emit('produce', {
                     room,
-                    forceTcp: false,
-                    rtpCapabilities: device.rtpCapabilities,
-                }, transport => resolve(transport))
-            })
-    
-            let transport = null;
-    
-            if (canProduce) {
-                transport = device.createSendTransport(transportResponse.params);
-                transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-                    console.log('transport produce event', { kind, rtpParameters, appData });
-                    // we may want to start out paused (if the checkboxes in the ui
-                    // aren't checked, for each media type. not very clean code, here
-                    // but, you know, this isn't a real application.)
-                    let paused = false;
-                    if (kind === 'video') {
-                        paused = isVideoSharingEnabled;
-                    } else if (kind === 'audio') {
-                        paused = isAudioSharingEnabled;
-                    }
-                    // tell the server what it needs to know from us in order to set
-                    // up a server-side producer object, and get back a
-                    // producer.id. call callback() on success or errback() on
-                    // failure.
-                    // let { error, id } = await sig('send-track', {
-                    //     transportId: transportOptions.id,
-                    //     kind,
-                    //     rtpParameters,
-                    //     paused,
-                    //     appData
-                    // });
-        
-                    socket.emit('produce', {
-                        room,
-                        kind,
-                        rtpParameters,
-                        paused,
-                        peerId,
-                    }, callback)
-                });
-            } else {
-                transport = await device.createRecvTransport(transportResponse.params);
+                    kind,
+                    rtpParameters,
+                    paused,
+                    peerId,
+                }, callback)
+            });
+        } else {
+            transport = await device.createRecvTransport(transportResponse.params);
+        }
+
+        transport.on('connect', async ({ dtlsParameters }, callback) => {
+            socket.emit('connectWebRTCTransport', { type, room, dtlsParameters, peerId }, callback)
+        });
+        transport.on('connectionstatechange', async (state) => {
+            console.log(`transport ${transport.id} connectionstatechange ${state}`);
+            
+            if (state === "connected") {
+                setIsBroadcasting(true)
             }
-    
-            transport.on('connect', async ({ dtlsParameters }, callback) => {
-                socket.emit('connectWebRTCTransport', { type, room, dtlsParameters, peerId }, callback)
-            });
-            transport.on('connectionstatechange', async (state) => {
-                console.log(`transport ${transport.id} connectionstatechange ${state}`);
-                
-                if (state === "connected") {
-                    setIsBroadcasting(true)
-                }
-    
-                // for this simple sample code, assume that transports being
-                // closed is an error (we never close these transports except when
-                // we leave the room)
-                if (state === 'closed' || state === 'failed' || state === 'disconnected') {
-                    console.log('transport closed ... leaving the room and resetting');
-                  leaveRoomTransport(transport);
-                }
-            });
-            return transport;
-        },
-        [rtpCapabilities],
-    )
 
+            // for this simple sample code, assume that transports being
+            // closed is an error (we never close these transports except when
+            // we leave the room)
+            if (state === 'closed' || state === 'failed' || state === 'disconnected') {
+                console.log('transport closed ... leaving the room and resetting');
+              leaveRoomTransport(transport);
+            }
+        });
+        return transport;
+    }
+    
     const produce = async mediaStream => {
-        const transport = await createTransport(true);
-        console.log('startVideoCameraBroadcast:transport', transport);
-
+        console.log('******************** produce');
+        const transport = sendingTransport || await createTransport(true);
+        if (!sendingTransport) {
+            setSendingTransport(transport)
+        }
         console.log('mediaStream.getVideoTracks()', mediaStream.getVideoTracks())
 
         await transport.produce({
@@ -214,6 +223,7 @@ export default function useStreaming({
     }
 
     const loadRtpCapabilities = async routerRtpCapabilities => {
+        console.log('******************** produce');
         if (device && !device._loaded) {
             await device.load({ routerRtpCapabilities });
         }
@@ -233,10 +243,10 @@ export default function useStreaming({
         publish,
         unpublish,
         loadRtpCapabilities,
-        createTransport,
         getConsumerOptions,
         joinRoom,
         leaveRoom,
-        getParticipants
+        getParticipants,
+        setupTransports
     }
 }

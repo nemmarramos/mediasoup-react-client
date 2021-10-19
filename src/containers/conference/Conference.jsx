@@ -1,5 +1,5 @@
 import { useRouteMatch } from 'react-router-dom'
-import { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import shortid from 'shortid';
 import { List, notification } from 'antd';
 
@@ -7,6 +7,8 @@ import socket from '../../socket';
 import SelfCameraView from '../../components/SelfCameraView';
 import useStreaming from '../../hooks/useStreaming';
 import Participant from './Participant';
+
+const MemoizedParticipant = React.memo(Participant)
 
 const Conference = () => {
     const [peerId] = useState(shortid.generate())
@@ -34,6 +36,8 @@ const Conference = () => {
             message: `${user.displayName} disconnected!`
         })
         const participants = await getParticipants()
+        console.log('participants', participants)
+
         setParticipants(participants)
     }
     const defaultUserProfile = {
@@ -45,7 +49,8 @@ const Conference = () => {
         joinRoom,
         leaveRoom,
         getParticipants,
-        getConsumer
+        getConsumer,
+        setupTransports,
     } = useStreaming({
         socket,
         room: roomName,
@@ -59,12 +64,15 @@ const Conference = () => {
     useEffect(() => {
         const startConnection = async _ => {
             await joinRoom()
+            await setupTransports()
             setIsRoomStarted(true)
-            const participants = await getParticipants()
-            setParticipants(participants)
         }
 
         startConnection()
+        .then(async _ => {
+            const participants = await getParticipants()
+            setParticipants(participants)
+        })
 
         return async () => {
             await leaveRoom()
@@ -116,8 +124,11 @@ const Conference = () => {
                         }}
                         renderItem={
                             item => {
+
                                 return (
-                                    <List.Item>
+                                    <List.Item
+                                        key={item.identifier}
+                                    >
                                         <Participant
                                             peerId={peerId}
                                             displayName={item.displayName}
