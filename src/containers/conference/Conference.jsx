@@ -88,7 +88,7 @@ const Conference = () => {
             startBroadcast()
         }
         
-    }, [cameraStream, isRoomStarted])
+    }, [cameraStream, isProducing])
 
     return (
         <div className="w-screen h-screen">
