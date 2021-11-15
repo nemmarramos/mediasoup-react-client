@@ -103,6 +103,9 @@ const Participant = ({
                 cover={
                     <video
                         id={videoElementId}
+                        autoPlay
+                        muted
+                        playsInline
                     />
                 } 
                 style={{
