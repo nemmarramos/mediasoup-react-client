@@ -21,7 +21,9 @@ const Participant = ({
     getVideoConsumer,
     getAudioConsumer,
     isSelf,
-    toConsumePeerId
+    toConsumePeerId,
+    videoProducerId,
+    audioProducerId
 }) => {
     const videoElementId = `participant_video_${toConsumePeerId}`
     const audioElementId = `participant_audio_${toConsumePeerId}`
@@ -71,18 +73,27 @@ const Participant = ({
     useEffect(() => {
         const connectToParticipant = async () => {
             const videoConsumer = await getVideoConsumer()
-            const audioConsumer = await getAudioConsumer()
 
             console.log('videoConsumer', videoConsumer)
-            console.log('audioConsumer', audioConsumer)
             await loadConsumerStream(videoConsumer, 'video')
+        }
+
+        if (!isSelf) {
+            connectToParticipant()
+        }
+    }, [videoProducerId])
+    useEffect(() => {
+        const connectToParticipant = async () => {
+            const audioConsumer = await getAudioConsumer()
+
+            console.log('audioConsumer', audioConsumer)
             await loadConsumerStream(audioConsumer, 'audio')
         }
 
         if (!isSelf) {
             connectToParticipant()
         }
-    }, [])
+    }, [audioProducerId])
     return (
         <div
             className="w-full h-full"

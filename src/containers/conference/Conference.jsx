@@ -1,5 +1,5 @@
 import { useRouteMatch } from 'react-router-dom'
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import shortid from 'shortid';
 import { List, notification } from 'antd';
 
@@ -7,8 +7,6 @@ import socket from '../../socket';
 import SelfCameraView from '../../components/SelfCameraView';
 import useStreaming from '../../hooks/useStreaming';
 import Participant from './Participant';
-
-const MemoizedParticipant = React.memo(Participant)
 
 const Conference = () => {
     const [peerId] = useState(shortid.generate())
@@ -21,25 +19,51 @@ const Conference = () => {
     const roomName = match.params.roomName
 
     const onUserJoined = user => {
+        console.log('onUserDisconnected', user)
+
         notification.success({
-            message: `${user.displayName} joined!`
+            message: `${user.identifier} joined!`
         })
-        setParticipants(current => [
-            ...current,
+        setParticipants(c => [
+            ...c,
             user
         ])
     }
 
     const onUserDisconnected = async user => {
-        console.log('onUserDisconnected', user.identifier)
+        console.log('onUserDisconnected', user)
         notification.success({
-            message: `${user.displayName} disconnected!`
+            message: `${user.identifier} disconnected!`
         })
-        const participants = await getParticipants()
-        console.log('participants', participants)
-
-        setParticipants(participants)
+        setParticipants(c => c.filter(v => v.identifier !== user.identifier))
     }
+
+    const onNewProducer =  async producer => {
+        setParticipants(participants => participants.map(p => {
+            if (p.identifier === producer.peerId) {
+                if (producer.kind === 'video') {
+                    return {
+                        ...p,
+                        media: {
+                            ...p.media,
+                            videoProducerId : producer.producerId
+                        }
+                    }
+                }
+                if (producer.kind === 'audio') {
+                    return {
+                        ...p,
+                        media: {
+                            ...p.media,
+                            audioProducerId : producer.producerId
+                        }
+                    }
+                }
+            }
+            return p
+        }))
+    }
+
     const defaultUserProfile = {
         identifier: peerId,
         displayName: 'Participant',
@@ -58,7 +82,8 @@ const Conference = () => {
         peerId,
         userProfile: defaultUserProfile,
         onUserJoined,
-        onUserDisconnected
+        onUserDisconnected,
+        onNewProducer
     })
 
     useEffect(() => {
@@ -118,7 +143,6 @@ const Conference = () => {
                             xs: 2,
                             sm: 2,
                             md: 4,
-                            lg: 5,
                             xl: 6,
                             xxl: 8,
                         }}
@@ -130,9 +154,10 @@ const Conference = () => {
                                         key={item.identifier}
                                     >
                                         <Participant
-                                            peerId={peerId}
                                             displayName={item.displayName}
                                             toConsumePeerId={item.identifier}
+                                            audioProducerId={item?.media?.audioProducerId}
+                                            videoProducerId={item?.media?.videoProducerId}
                                             getVideoConsumer={() => getConsumer({ toConsumePeerId: item.identifier, kind: 'video' })}
                                             getAudioConsumer={() => getConsumer({ toConsumePeerId: item.identifier, kind: 'audio' })}
                                             isSelf={item.identifier === peerId}

@@ -1,6 +1,5 @@
 import { Device } from "mediasoup-client";
-import { useCallback, useEffect, useState } from "react"
-import shortid from "shortid";
+import { useEffect, useState } from "react"
 
 const CAM_VIDEO_SIMULCAST_ENCODINGS =
 [
@@ -14,7 +13,8 @@ export default function useStreaming({
     peerId,
     userProfile,
     onUserJoined,
-    onUserDisconnected
+    onUserDisconnected,
+    onNewProducer
 }) {
     const device = new Device();
     const [rtpCapabilities, setRtpCapabilities] = useState()
@@ -27,6 +27,7 @@ export default function useStreaming({
     useEffect(() => {
         socket.on('userJoined', onUserJoined)
         socket.on('userDisconnected', onUserDisconnected)
+        socket.on('onNewProducer', onNewProducer)
         return () => {
             socket.removeAllListeners();
         }
