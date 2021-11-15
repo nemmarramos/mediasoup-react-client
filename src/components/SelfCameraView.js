@@ -13,6 +13,7 @@ const SelfCameraView = ({ onCameraStreamStarted }) => {
             className="w-full h-full bg-black object-cover absolute top-0 left-0"
             autoPlay
             muted
+            playsInline
             // style={{
             //     transform: 'scaleX(-1)'
             // }}
